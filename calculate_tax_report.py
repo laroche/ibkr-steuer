@@ -162,9 +162,6 @@ def parse_ibkr_csv_report(csv_path):
     Returns:
         dict with 'fx_results', 'fx_total_gain', 'fx_total_loss', 'category_totals'
     """
-    import csv as csv_module
-    import io
-
     fx_results = {}
     fx_total_gain = 0.0
     fx_total_loss = 0.0
@@ -175,32 +172,32 @@ def parse_ibkr_csv_report(csv_path):
 
     with open(csv_path, 'r', encoding='utf-8-sig') as f:
         for line in f:
-            parts = list(csv_module.reader(io.StringIO(line)))[0]
+            parts = list(csv.reader(io.StringIO(line)))[0]
 
             # Dividenden/Zinsen/Quellensteuer EUR totals
             # Multi-Currency-CSVs haben eine explizite "Gesamt X in EUR"-Zeile (echte Summe
             # über alle Währungen). Single-Currency-CSVs haben nur "Gesamtwert in EUR"
             # (USD-Teil umgerechnet = Gesamt). Präzise Zeile gewinnt, Gesamtwert ist Fallback.
             if len(parts) >= 6:
-                field = parts[2].strip() if len(parts) > 2 else ''
+                #field = parts[2].strip() if len(parts) > 2 else ''
                 if line.startswith('Dividenden,Data,Gesamt Dividenden in EUR'):
                     income_totals['dividends_eur'] = safe_float(parts[5], 0)
                     continue
-                elif line.startswith('Dividenden,Data,Gesamtwert in EUR'):
+                if line.startswith('Dividenden,Data,Gesamtwert in EUR'):
                     if 'dividends_eur' not in income_totals:
                         income_totals['dividends_eur'] = safe_float(parts[5], 0)
                     continue
-                elif line.startswith('Zinsen,Data,Gesamt Zinsen in EUR'):
+                if line.startswith('Zinsen,Data,Gesamt Zinsen in EUR'):
                     income_totals['interest_eur'] = safe_float(parts[5], 0)
                     continue
-                elif line.startswith('Zinsen,Data,Gesamtwert in EUR'):
+                if line.startswith('Zinsen,Data,Gesamtwert in EUR'):
                     if 'interest_eur' not in income_totals:
                         income_totals['interest_eur'] = safe_float(parts[5], 0)
                     continue
-                elif line.startswith('Quellensteuer,Data,Gesamt Quellensteuer in EUR'):
+                if line.startswith('Quellensteuer,Data,Gesamt Quellensteuer in EUR'):
                     income_totals['withholding_tax_eur'] = safe_float(parts[5], 0)
                     continue
-                elif line.startswith('Quellensteuer,Data,Gesamtwert in EUR'):
+                if line.startswith('Quellensteuer,Data,Gesamtwert in EUR'):
                     if 'withholding_tax_eur' not in income_totals:
                         income_totals['withholding_tax_eur'] = safe_float(parts[5], 0)
                     continue
@@ -329,9 +326,6 @@ def _resolve_fx_outflows(fx_pnl_rows, fx_balance_timeline, tax_year):
             damit derselbe Cash-Event nicht zweimal als prev-Balance-Quelle dient
             (siehe Codex-Hinweis 2026-05-27 zum Duplicate-Split-Bug).
     """
-    import re
-    from collections import defaultdict
-
     # Sammle alle relevanten Outflows mit ihrem Listen-Index.
     # WICHTIG (Codex-Fix 2026-05-27): KEIN abs(pnl)-Filter hier. IBKR emittiert
     # FIFO-Splits, bei denen eine Leg zufällig realizedPL=0 haben kann (z.B. wenn
@@ -423,20 +417,20 @@ def _resolve_fx_outflows(fx_pnl_rows, fx_balance_timeline, tax_year):
                                       'match_type': 'aggregat'}
 
     # Pass 3: OPT-Description-Parser — Match auf symbol/strike/expiry/putCall
-    for ev in outflows:
-        if ev['idx'] in resolved:
-            continue
-        opt = _parse_fx_opt_desc(ev['desc'])
-        if not opt:
-            continue
-        timeline = fx_balance_timeline.get(ev['curr'], [])
+    #for ev in outflows:
+        #if ev['idx'] in resolved:
+        #    continue
+        #opt = _parse_fx_opt_desc(ev['desc'])
+        #if not opt:
+        #    continue
+        #timeline = fx_balance_timeline.get(ev['curr'], [])
         # Hier brauchen wir Zugriff auf die StmtFunds-Attribute (symbol/strike/expiry/putCall).
         # Die fx_balance_timeline hat aber nur (date, txid, amount, prev, after). Daher
         # Pass 3 nur sinnvoll, wenn wir Timeline mit Description erweitern. Tun wir hier
         # nicht — überspringe, weil Pass 1+2 für die meisten Fälle reicht und Pass 4
         # ähnliche Fälle abdeckt.
         # (Lass den Match-Type 'opt_parse' im API für künftige Erweiterung)
-        pass
+        #pass
 
     # Pass 4: Symbol-Aggregat — mehrere Split-Outflows pro (date, currency, symbol)
     # Auch hier require_unique, weil mehrere Cash-Events mit gleichem aggregierten
@@ -624,7 +618,7 @@ def _finalize_fx_state(state, tax_year):
         _add_fx_negative_days(state['days_negative'], last_date, datetime(tax_year, 12, 31).date(), tax_year)
 
 
-def calculate_fx_gains(trades, fx_transactions, tax_year, base_currency='EUR'):
+def calculate_fx_gains(trades, fx_transactions, tax_year):
     """
     Berechnet FIFO-basierte Fremdwährungs-Gewinne/Verluste pro Währung.
 
@@ -825,7 +819,7 @@ def _get_open_option_sells(trades, a_cat, strike, expiry, pc, assignment_qty_for
         if remaining_close >= s_qty:
             remaining_close -= s_qty
             continue  # Fully consumed by close (buyback or expiry)
-        elif remaining_close > 0:
+        if remaining_close > 0:
             open_qty = s_qty - remaining_close
             remaining_close = 0
             s_copy = dict(s)
@@ -1530,7 +1524,7 @@ def calculate_tax(ib_tax_dir, tax_year=None, fx_csv_path=None, anlage_so_overrid
         print(f"Base currency is {base_currency} — no USD→EUR rate map needed.")
 
     # 2b. Build ETF lookup from financial_instruments.csv
-    from etf_classification import get_classification, get_etf_info, get_teilfreistellung, is_known_etf, ETF_CLASSIFICATION
+    from etf_classification import get_etf_info, get_teilfreistellung, is_known_etf, ETF_CLASSIFICATION
 
     anlage_so_overrides_set = set(anlage_so_overrides or ())
 
@@ -1737,11 +1731,10 @@ def calculate_tax(ib_tax_dir, tax_year=None, fx_csv_path=None, anlage_so_overrid
 
     # Write debug CSV
     if debug_rows:
-        import csv as csv_mod
         debug_path = os.path.join(ib_tax_dir, 'trades_debug_eur.csv')
         with open(debug_path, 'w', newline='', encoding='utf-8') as f:
             export_fields = [k for k in debug_rows[0].keys() if not k.startswith('_')]
-            w = csv_mod.DictWriter(f, fieldnames=export_fields, extrasaction='ignore')
+            w = csv.DictWriter(f, fieldnames=export_fields, extrasaction='ignore')
             w.writeheader()
             w.writerows(debug_rows)
         print(f"Debug: {len(debug_rows)} Trades mit EUR-Umrechnung → {debug_path}")
@@ -2271,8 +2264,6 @@ def calculate_tax(ib_tax_dir, tax_year=None, fx_csv_path=None, anlage_so_overrid
     zufluss_details = []
     prior_zufluss_details = []
 
-    from collections import defaultdict
-
     def _option_key(t):
         return (t.get('assetCategory'), t.get('underlyingSymbol', ''),
                 t.get('strike'), t.get('expiry'), t.get('putCall'))
@@ -2569,7 +2560,7 @@ def calculate_tax(ib_tax_dir, tax_year=None, fx_csv_path=None, anlage_so_overrid
                              and d.year < tax_year]
 
     # Build FIFO lots per underlying symbol from prior-year put assignments
-    from collections import deque
+    #from collections import deque
     put_assignment_lots = {}  # {symbol: deque of (date, shares_remaining, premium_per_share_eur)}
     # Issue #55: paralleles immutable Dict fuer _tageskurs_put_adj. Da
     # put_assignment_lots durch die Apply-Schleife (popleft bei shares_remaining<=0)
@@ -3618,7 +3609,7 @@ def calculate_tax(ib_tax_dir, tax_year=None, fx_csv_path=None, anlage_so_overrid
     if not fx_results and os.path.exists(fx_path) and base_currency == 'EUR':
         fx_transactions = load_csv(fx_path)
         fx_results, fx_total_gain, fx_total_loss, fx_has_prior_data = calculate_fx_gains(
-            trades, fx_transactions, tax_year, base_currency
+            trades, fx_transactions, tax_year
         )
         for data in fx_results.values():
             data['corrected_gain'] = data.get('gain', 0.0)

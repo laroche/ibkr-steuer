@@ -1,7 +1,7 @@
-import streamlit as st
 import os
 import tempfile
 from datetime import datetime as _dt
+import streamlit as st
 
 import extract_ibkr_data
 import calculate_tax_report
@@ -264,7 +264,7 @@ def fmt_de(value: float, decimals: int = 2) -> str:
 def color_class(value: float) -> str:
     if value > 0:
         return "green"
-    elif value < 0:
+    if value < 0:
         return "red"
     return "white"
 
@@ -1837,7 +1837,7 @@ if d:
         sym = (row.get('symbol', '') or '').strip()
         return sym.split()[0] if sym else '?'
 
-    def _build_excel(trade_details, trades_by_topf, export_context):
+    def _build_excel(trades_by_topf, export_context):
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
@@ -2110,7 +2110,7 @@ if d:
         'so_free': so_free_export,
     }
     try:
-        xlsx_data = _build_excel(trade_details, trades_by_topf, export_context)
+        xlsx_data = _build_excel(trades_by_topf, export_context)
     except ModuleNotFoundError as e:
         if e.name != 'openpyxl':
             raise
